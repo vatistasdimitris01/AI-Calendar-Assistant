@@ -9,8 +9,15 @@ function Login() {
   const handleLogin = () => {
     const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
 
+    // Determine the redirect URI and log it for easier debugging by the user.
+    const redirectUri = window.location.origin;
+    console.log(
+        'Attempting to login with Google. Ensure this redirect URI is in your Google Cloud Console authorized list:', 
+        redirectUri
+    );
+
     const options = {
-      redirect_uri: window.location.origin,
+      redirect_uri: redirectUri,
       client_id: GOOGLE_CLIENT_ID,
       access_type: 'online',
       response_type: 'token',
