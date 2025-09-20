@@ -28,20 +28,37 @@ const localizer = dateFnsLocalizer({
 const CalendarView: React.FC = () => {
   const { events, currentDate, setCurrentDate, view, setView, openEventModal } = useCalendarStore();
 
-  const formattedEvents = useMemo(() => {
-    if (!events) return [];
-    // Events from the store are already filtered based on selected calendars.
-    // We just need to map them to the format react-big-calendar expects.
+  const formattedEvents: CalendarEvent[] = useMemo(() => {
+    if (!Array.isArray(events)) return [];
+    
     return events
-      .filter(event => event && event.start && event.end)
-      .map((event: GCalEvent) => ({
-        id: event.id,
-        title: event.summary || '',
-        start: new Date(event.start.dateTime || event.start.date!),
-        end: new Date(event.end.dateTime || event.end.date!),
-        allDay: !!event.start.date,
-        resource: event,
-      }));
+      .filter((event): event is GCalEvent => 
+        !!(event && event.id && event.start && event.end && (event.start.dateTime || event.start.date) && (event.end.dateTime || event.end.date))
+      )
+      .map((event: GCalEvent) => {
+        try {
+          const start = new Date(event.start.dateTime || event.start.date!);
+          const end = new Date(event.end.dateTime || event.end.date!);
+          
+          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            console.warn('Skipping event with invalid date:', event);
+            return null;
+          }
+
+          return {
+            id: event.id,
+            title: event.summary || '(No Title)',
+            start, end,
+            allDay: !!event.start.date,
+            resource: event,
+          };
+        } catch (error) {
+          console.error("Failed to process event:", event, error);
+          return null;
+        }
+      })
+      // FIX: Corrected the type predicate to correctly narrow the type after filtering out nulls.
+      .filter((event): event is NonNullable<typeof event> => event !== null);
   }, [events]);
 
   const handleSelectEvent = (event: CalendarEvent) => {

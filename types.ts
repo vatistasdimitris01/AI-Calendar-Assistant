@@ -19,11 +19,11 @@ export interface GCalEvent {
   summary?: string;
   description?: string;
   start: {
-    dateTime: string;
+    dateTime?: string;
     date?: string;
   };
   end: {
-    dateTime: string;
+    dateTime?: string;
     date?: string;
   };
   organizer: {
