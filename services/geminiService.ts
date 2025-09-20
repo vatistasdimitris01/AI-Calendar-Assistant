@@ -1,5 +1,4 @@
-
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import type { GCalEvent } from '../types';
 
 if (!process.env.API_KEY) {
@@ -8,8 +7,6 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
-// FIX: Removed deprecated and unused model definition.
-// According to the guidelines, models should not be defined this way, and the model name should be passed directly to `generateContent`.
 function formatEventsForPrompt(events: GCalEvent[]): string {
   if (!events || events.length === 0) {
     return 'The user has no upcoming events.';
@@ -33,7 +30,7 @@ export async function summarizeEvents(events: GCalEvent[]): Promise<string> {
     return response.text;
   } catch (error) {
     console.error("Error summarizing events:", error);
-    return "Sorry, I couldn't summarize the events right now.";
+    throw error;
   }
 }
 
@@ -53,7 +50,7 @@ export async function suggestTime(events: GCalEvent[], task: string): Promise<st
     return response.text;
   } catch (error) {
     console.error("Error suggesting time:", error);
-    return "Sorry, I couldn't find a suitable time right now.";
+    throw error;
   }
 }
 
@@ -68,7 +65,7 @@ export async function generateDescription(title: string): Promise<string> {
     return response.text;
   } catch (error) {
     console.error("Error generating description:", error);
-    return "";
+    throw error;
   }
 }
 
@@ -87,6 +84,44 @@ export async function answerScheduleQuestion(events: GCalEvent[], question: stri
     return response.text;
   } catch (error) {
     console.error("Error answering question:", error);
-    return "Sorry, I couldn't answer that question right now.";
+    throw error;
   }
+}
+
+const eventCreationSchema = {
+    type: Type.OBJECT,
+    properties: {
+        is_event_creation_request: { 
+            type: Type.BOOLEAN, 
+            description: "Set to true only if the user is explicitly asking to create, schedule, book, or add a new event to their calendar. Otherwise, set to false." 
+        },
+        summary: { type: Type.STRING, nullable: true, description: "The title of the event." },
+        start_time: { type: Type.STRING, description: "The start time of the event in full ISO 8601 format (YYYY-MM-DDTHH:mm:ss). Infer this from the user's prompt and the current date if necessary.", nullable: true },
+        end_time: { type: Type.STRING, description: "The end time of the event in full ISO 8601 format (YYYY-MM-DDTHH:mm:ss). If not specified, infer a sensible duration (e.g., 1 hour after start time).", nullable: true }
+    }
+};
+
+export async function createEventFromPrompt(prompt: string): Promise<any> {
+    const fullPrompt = `
+      Analyze the following user request. Your task is to determine if it is a command to create a calendar event.
+      - The current date is: ${new Date().toISOString()}.
+      - If the user wants to create an event, extract the event details into the specified JSON format.
+      - If the user is just asking a question or making a statement that is NOT a request to create an event, set 'is_event_creation_request' to false.
+      
+      User Request: "${prompt}"
+    `;
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: fullPrompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: eventCreationSchema,
+            }
+        });
+        return JSON.parse(response.text);
+    } catch (error) {
+        console.error("Error creating event from prompt:", error);
+        throw error;
+    }
 }

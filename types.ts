@@ -17,6 +17,12 @@ export interface GCalEvent {
     dateTime: string;
     date?: string;
   };
+  organizer: {
+    email: string;
+    displayName?: string;
+    self?: boolean;
+  };
+  calendarId?: string;
   [key: string]: any;
 }
 
@@ -32,4 +38,13 @@ export interface CalendarEvent {
 export interface AiChatMessage {
   role: 'user' | 'model';
   content: string;
+}
+
+export interface CalendarListEntry {
+  id: string;
+  summary: string;
+  backgroundColor: string;
+  foregroundColor: string;
+  primary?: boolean;
+  selected?: boolean;
 }

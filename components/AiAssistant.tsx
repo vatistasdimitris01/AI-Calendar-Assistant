@@ -1,6 +1,6 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { summarizeEvents, suggestTime, answerScheduleQuestion } from '../services/geminiService';
+import { summarizeEvents, suggestTime, answerScheduleQuestion, createEventFromPrompt } from '../services/geminiService';
+import { createEvent } from '../services/calendarService';
 import useCalendarStore from '../hooks/useCalendarStore';
 import { SparklesIcon, SendIcon, BotIcon } from './icons';
 import type { AiChatMessage } from '../types';
@@ -12,7 +12,7 @@ const PredefinedPrompt: React.FC<{ text: string, onClick: (text: string) => void
 );
 
 function AiAssistant() {
-  const { events } = useCalendarStore();
+  const { events, accessToken, addEvent } = useCalendarStore();
   const [messages, setMessages] = useState<AiChatMessage[]>([
       { role: 'model', content: "Hello! I'm your AI assistant. How can I help you with your schedule today?" }
   ]);
@@ -36,15 +36,36 @@ function AiAssistant() {
 
     let response = '';
     try {
-        if (promptText.toLowerCase().includes('summarize')) {
-            response = await summarizeEvents(events);
-        } else if (promptText.toLowerCase().match(/free|suggest|find time/)) {
-            response = await suggestTime(events, promptText);
+        // Attempt to create an event first
+        const creationAttempt = await createEventFromPrompt(promptText);
+        if (creationAttempt && creationAttempt.is_event_creation_request && creationAttempt.summary && creationAttempt.start_time && creationAttempt.end_time && accessToken) {
+            const eventData = {
+                summary: creationAttempt.summary,
+                start: { dateTime: new Date(creationAttempt.start_time).toISOString() },
+                end: { dateTime: new Date(creationAttempt.end_time).toISOString() },
+            };
+            const newEvent = await createEvent(accessToken, eventData);
+            addEvent(newEvent);
+            response = `OK, I've added "${newEvent.summary}" to your calendar.`;
         } else {
-            response = await answerScheduleQuestion(events, promptText);
+            // Fallback to question answering / other commands
+            if (promptText.toLowerCase().includes('summarize')) {
+                response = await summarizeEvents(events);
+            } else if (promptText.toLowerCase().match(/free|suggest|find time/)) {
+                response = await suggestTime(events, promptText);
+            } else {
+                response = await answerScheduleQuestion(events, promptText);
+            }
         }
     } catch (e) {
-        response = "Sorry, I encountered an error. Please try again."
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        if (errorMessage.includes('API key not valid')) {
+            response = "The AI Assistant is misconfigured. The provided Gemini API key is not valid.";
+        } else if (errorMessage.includes('API key not found')) {
+            response = "The AI Assistant is not configured. Please set the Gemini API key to enable this feature.";
+        } else {
+            response = "Sorry, I encountered an error. Please try again later."
+        }
     } finally {
         setMessages([...newMessages, { role: 'model', content: response }]);
         setIsLoading(false);
@@ -52,7 +73,7 @@ function AiAssistant() {
   };
 
   return (
-    <div className="flex flex-col h-full p-4">
+    <div className="flex flex-col h-full p-4 bg-gray-50 dark:bg-gray-800/50">
       <div className="flex items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-3">
         <SparklesIcon className="w-6 h-6 text-blue-500 mr-2" />
         <h2 className="text-lg font-bold">AI Assistant</h2>
@@ -66,7 +87,7 @@ function AiAssistant() {
                 <BotIcon className="w-5 h-5"/>
               </div>
             )}
-            <div className={`max-w-xs md:max-w-sm lg:max-w-md px-4 py-2 rounded-2xl ${msg.role === 'user' ? 'bg-blue-500 text-white rounded-br-lg' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-lg'}`}>
+            <div className={`max-w-xs md:max-w-sm lg:max-w-md px-4 py-2 rounded-2xl ${msg.role === 'user' ? 'bg-blue-500 text-white rounded-br-lg' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-lg'}`}>
               <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
             </div>
           </div>
@@ -92,7 +113,7 @@ function AiAssistant() {
         <div className="space-y-2 mb-4">
             <PredefinedPrompt text="Summarize my week" onClick={handleSend} />
             <PredefinedPrompt text="What's on my schedule for tomorrow?" onClick={handleSend} />
-            <PredefinedPrompt text="When am I free for a 1-hour meeting?" onClick={handleSend} />
+            <PredefinedPrompt text="Schedule a meeting with the design team tomorrow at 2pm" onClick={handleSend} />
         </div>
       )}
 
@@ -102,8 +123,8 @@ function AiAssistant() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Ask about your schedule..."
-          className="w-full p-3 pr-12 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+          placeholder="Ask or command..."
+          className="w-full p-3 pr-12 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
           disabled={isLoading}
         />
         <button onClick={() => handleSend()} disabled={isLoading || !input.trim()} className="absolute inset-y-0 right-0 flex items-center justify-center w-10 text-gray-500 hover:text-blue-500 disabled:text-gray-300">
