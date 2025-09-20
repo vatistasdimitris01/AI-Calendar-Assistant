@@ -1,3 +1,12 @@
+// FIX: Add global type definition for import.meta.env to resolve TypeScript errors.
+// This makes the Vite-specific environment variables type-safe across the application.
+declare global {
+  interface ImportMeta {
+    readonly env: {
+      readonly VITE_GOOGLE_CLIENT_ID: string;
+    }
+  }
+}
 
 export interface UserProfile {
   name: string;

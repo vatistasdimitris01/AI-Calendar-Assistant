@@ -3,7 +3,7 @@ import React from 'react';
 import useCalendarStore from '../hooks/useCalendarStore';
 import { GoogleIcon, SparklesIcon } from './icons';
 
-const GOOGLE_CLIENT_ID = '456333706536-g4qjlt30bt1a4q32esu0l4pu9uhm6913.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 function Login() {
   const handleLogin = () => {
