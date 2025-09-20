@@ -1,11 +1,25 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import type { GCalEvent } from '../types';
 
-if (!process.env.API_KEY) {
-  console.warn("Gemini API key not found. AI features will not work. Make sure to set the API_KEY environment variable.");
+// FIX: Per coding guidelines, the API key must be obtained from process.env.API_KEY.
+const GEMINI_API_KEY = process.env.API_KEY;
+
+let ai: GoogleGenAI | null = null;
+if (GEMINI_API_KEY) {
+    ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+} else {
+    // This warning will appear in the browser console if the key is missing.
+    console.warn("Gemini API key not found. AI features will not work. Please set the API_KEY environment variable.");
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+function getAiClient(): GoogleGenAI {
+    if (!ai) {
+        // This error will be caught by the calling function and displayed in the UI.
+        throw new Error("API key not found");
+    }
+    return ai;
+}
+
 
 function formatEventsForPrompt(events: GCalEvent[]): string {
   if (!events || events.length === 0) {
@@ -26,7 +40,7 @@ export async function summarizeEvents(events: GCalEvent[]): Promise<string> {
     Provide a brief summary of the upcoming schedule.
   `;
   try {
-    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+    const response = await getAiClient().models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
     return response.text;
   } catch (error) {
     console.error("Error summarizing events:", error);
@@ -46,7 +60,7 @@ export async function suggestTime(events: GCalEvent[], task: string): Promise<st
     Suggest a few optimal time slots for their task, considering their existing schedule.
   `;
   try {
-    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+    const response = await getAiClient().models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
     return response.text;
   } catch (error) {
     console.error("Error suggesting time:", error);
@@ -61,7 +75,7 @@ export async function generateDescription(title: string): Promise<string> {
     The description should be a short paragraph.
   `;
   try {
-    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+    const response = await getAiClient().models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
     return response.text;
   } catch (error) {
     console.error("Error generating description:", error);
@@ -80,7 +94,7 @@ export async function answerScheduleQuestion(events: GCalEvent[], question: stri
     Provide a direct and helpful answer to their question.
   `;
   try {
-    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+    const response = await getAiClient().models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
     return response.text;
   } catch (error) {
     console.error("Error answering question:", error);
@@ -111,7 +125,7 @@ export async function createEventFromPrompt(prompt: string): Promise<any> {
       User Request: "${prompt}"
     `;
     try {
-        const response = await ai.models.generateContent({
+        const response = await getAiClient().models.generateContent({
             model: 'gemini-2.5-flash',
             contents: fullPrompt,
             config: {
