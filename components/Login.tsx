@@ -2,32 +2,41 @@
 import React from 'react';
 import useCalendarStore from '../hooks/useCalendarStore';
 import { GoogleIcon, SparklesIcon } from './icons';
-
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+import { useGoogleLogin, hasGrantedAllScopesGoogle } from '@react-oauth/google';
+import type { UserProfile } from '../types';
 
 function Login() {
-  const handleLogin = () => {
-    const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+  const { setLoginData } = useCalendarStore();
 
-    // Determine the redirect URI and log it for easier debugging by the user.
-    const redirectUri = window.location.origin;
-    console.log(
-        'Attempting to login with Google. Ensure this redirect URI is in your Google Cloud Console authorized list:', 
-        redirectUri
-    );
+  const login = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      const requestedScopes = ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/calendar.events'] as const;
+      const hasGrantedAll = hasGrantedAllScopesGoogle(tokenResponse, ...requestedScopes);
 
-    const options = {
-      redirect_uri: redirectUri,
-      client_id: GOOGLE_CLIENT_ID,
-      access_type: 'online',
-      response_type: 'token',
-      prompt: 'consent',
-      scope: 'openid email profile https://www.googleapis.com/auth/calendar.events',
-    };
-
-    const qs = new URLSearchParams(options).toString();
-    window.location.assign(`${rootUrl}?${qs}`);
-  };
+      if (hasGrantedAll) {
+        try {
+          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+          });
+          const profile: UserProfile = await res.json();
+          setLoginData(tokenResponse.access_token, tokenResponse.expires_in, profile);
+        } catch (err) {
+          console.error("Failed to fetch user profile", err);
+          alert("An error occurred while fetching your profile. Please try again.");
+        }
+      } else {
+        console.error("Login failed: Not all requested scopes were granted.");
+        alert("Login failed: Please grant all requested permissions to use the app. If you denied a permission, you may need to revoke app access in your Google account settings and try again.");
+      }
+    },
+    onError: (errorResponse) => {
+      console.error('Login Failed:', errorResponse);
+      alert('Login failed. Please try again.');
+    },
+    scope: 'openid email profile https://www.googleapis.com/auth/calendar.events',
+    flow: 'implicit',
+    prompt: 'consent',
+  });
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-blue-100 dark:from-gray-900 dark:to-blue-900">
@@ -40,7 +49,7 @@ function Login() {
           Your personal scheduling genius. Let Gemini AI organize your life, one event at a time.
         </p>
         <button
-          onClick={handleLogin}
+          onClick={() => login()}
           className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 shadow-lg transform hover:scale-105 transition-transform duration-200"
         >
           <GoogleIcon className="w-6 h-6 mr-3" />
