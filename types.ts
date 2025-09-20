@@ -16,7 +16,7 @@ export interface UserProfile {
 
 export interface GCalEvent {
   id: string;
-  summary: string;
+  summary?: string;
   description?: string;
   start: {
     dateTime: string;

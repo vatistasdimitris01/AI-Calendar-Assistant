@@ -33,10 +33,10 @@ const CalendarView: React.FC = () => {
     // Events from the store are already filtered based on selected calendars.
     // We just need to map them to the format react-big-calendar expects.
     return events
-      .filter(event => event && event.summary && event.start && event.end)
+      .filter(event => event && event.start && event.end)
       .map((event: GCalEvent) => ({
         id: event.id,
-        title: event.summary,
+        title: event.summary || '',
         start: new Date(event.start.dateTime || event.start.date!),
         end: new Date(event.end.dateTime || event.end.date!),
         allDay: !!event.start.date,

@@ -2,7 +2,7 @@
 import React from 'react';
 import useCalendarStore from '../hooks/useCalendarStore';
 import { GoogleIcon, SparklesIcon } from './icons';
-import { useGoogleLogin, hasGrantedAllScopesGoogle } from '@react-oauth/google';
+import { useGoogleLogin } from '@react-oauth/google';
 import type { UserProfile } from '../types';
 
 function Login() {
@@ -10,30 +10,22 @@ function Login() {
 
   const login = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
-      const requestedScopes = ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/calendar.events'] as const;
-      const hasGrantedAll = hasGrantedAllScopesGoogle(tokenResponse, ...requestedScopes);
-
-      if (hasGrantedAll) {
-        try {
-          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-          });
-          const profile: UserProfile = await res.json();
-          setLoginData(tokenResponse.access_token, tokenResponse.expires_in, profile);
-        } catch (err) {
-          console.error("Failed to fetch user profile", err);
-          alert("An error occurred while fetching your profile. Please try again.");
-        }
-      } else {
-        console.error("Login failed: Not all requested scopes were granted.");
-        alert("Login failed: Please grant all requested permissions to use the app. If you denied a permission, you may need to revoke app access in your Google account settings and try again.");
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const profile: UserProfile = await res.json();
+        setLoginData(tokenResponse.access_token, tokenResponse.expires_in, profile);
+      } catch (err) {
+        console.error("Failed to fetch user profile", err);
+        alert("An error occurred while fetching your profile. Please try again.");
       }
     },
     onError: (errorResponse) => {
       console.error('Login Failed:', errorResponse);
       alert('Login failed. Please try again.');
     },
-    scope: 'openid email profile https://www.googleapis.com/auth/calendar.events',
+    scope: 'openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly',
     flow: 'implicit',
     prompt: 'consent',
   });
