@@ -1,0 +1,5 @@
+{
+  "name": "AI Calendar Assistant",
+  "description": "An intelligent calendar application that integrates with your Google Calendar and uses Gemini AI to help you summarize events, find optimal scheduling times, and manage your day more effectively.",
+  "requestFramePermissions": []
+}
